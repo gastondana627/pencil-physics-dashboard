@@ -4,25 +4,31 @@
   "description": "Native IDE dashboard for the Pencil Physics constraint pipeline.",
   "version": "0.0.1",
   "engines": {
-      "vscode": "^1.90.0"
+    "vscode": "^1.90.0"
   },
-  "categories": [
-      "Other"
-  ],
-  "activationEvents": [],
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onCommand:pencil-physics-dashboard.openDashboard"
+  ],
   "contributes": {
-      "commands": [
-          {
-              "command": "pencil-physics-dashboard.openDashboard",
-              "title": "Pencil Physics: Open Metric Panel"
-          }
-      ]
+    "commands": [
+      {
+        "command": "pencil-physics-dashboard.openDashboard",
+        "title": "Pencil Physics: Open Metric Panel"
+      }
+    ]
   },
   "scripts": {
-      "vscode:prepublish": "npm run compile",
-      "compile": "tsc -b",
-      "watch": "tsc -b -w",
-      "lint": "eslint src"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.9.1",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^6.0.3",
+    "mocha": "^10.0.0"
   }
 }
