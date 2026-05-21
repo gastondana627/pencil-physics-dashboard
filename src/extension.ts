@@ -26,14 +26,18 @@ export function activate(context: vscode.ExtensionContext) {
         watcher.onDidChange(() => updateWebview());
         watcher.onDidCreate(() => updateWebview());
 
-        // Watch the Telemetry Calendar in the root
+        // Watch the Telemetry Calendar and Models Config in the root
         const calendarWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(rootPath, 'telemetry_calendar.json'));
         calendarWatcher.onDidChange(() => updateWebview());
         calendarWatcher.onDidCreate(() => updateWebview());
         
+        const configWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(rootPath, 'models_config.json'));
+        configWatcher.onDidChange(() => updateWebview());
+
         panel.onDidDispose(() => {
             watcher.dispose();
             calendarWatcher.dispose();
+            configWatcher.dispose();
         }, null, context.subscriptions);
     });
 
@@ -87,42 +91,25 @@ function getWebviewContent(resultsPath: string, rootPath: string): string {
         } catch(e) {}
     }
 
-    let leaderboardMap: Record<string, { score: number, status: string, label: string }> = {
-        "Gemini 2.5 Pro": { score: 0.00, status: "untested", label: "Pending Setup ⏳" },
-        "Gemini 2.5 Flash": { score: 0.00, status: "untested", label: "Pending Setup ⏳" },
-        "DeepSeek V3.2": { score: 0.00, status: "untested", label: "Pending Setup ⏳" },
-        "Claude Opus 4.6": { score: 0.00, status: "untested", label: "Pending Setup ⏳" },
-        "Gemma 4 26B A4B": { score: 0.72, status: "success", label: "0.72" },
-        "Gemini 2.0 Flash Lite": { score: 0.67, status: "success", label: "0.67" },
-        "Gemini 3.1 Flash-Lite Preview": { score: 0.67, status: "success", label: "0.67" },
-        "Gemma 4 31B": { score: 0.56, status: "success", label: "0.56" },
-        "Claude Sonnet 4.6": { score: 0.53, status: "success", label: "0.53" },
-        "Grok 4.20 (Non-Reasoning)": { score: 0.42, status: "success", label: "0.42" },
-        "Qwen 3 235B A22B Instruct": { score: 0.33, status: "success", label: "0.33" },
-        "Claude Opus 4.7": { score: 0.33, status: "success", label: "0.33" },
-        "GLM-5": { score: 0.33, status: "success", label: "0.33" },
-        "Claude Haiku 4.5": { score: 0.31, status: "success", label: "0.31" },
-        "Gemini 3.1 Pro Preview": { score: 0.30, status: "success", label: "0.30" },
-        "Gemini 2.0 Flash": { score: 0.26, status: "success", label: "0.26" },
-        "Qwen 3 Next 80B Instruct": { score: 0.26, status: "success", label: "0.26" },
-        "Qwen 3 Coder 480B": { score: 0.26, status: "success", label: "0.26" },
-        "Deepseek V3.1": { score: 0.26, status: "success", label: "0.26" },
-        "GPT-5.4 nano": { score: 0.26, status: "success", label: "0.26" },
-        "GPT-5.4 mini": { score: 0.26, status: "success", label: "0.26" },
-        "GPT-5.5": { score: 0.26, status: "success", label: "0.26" },
-        "Grok 4.20 Reasoning": { score: 0.26, status: "success", label: "0.26" },
-        "Qwen 3 Next 80B Thinking": { score: 0.26, status: "success", label: "0.26" },
-        "Gemini 3 Flash Preview": { score: 0.26, status: "success", label: "0.26" },
-        "gpt-oss-20b": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "gpt-oss-120b": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "Claude Opus 4.5": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "Claude Sonnet 4.5": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "Claude Opus 4.1": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "Claude Sonnet 4": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "DeepSeek-R1": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" },
-        "GPT-5.4": { score: 0.00, status: "untested", label: "Still Needs Testing ⏳" }
-    };
+    // 3. Load Model Config Dynamic Map
+    let leaderboardMap: Record<string, { score: number, status: string, label: string }> = {};
+    const configPath = path.join(rootPath, 'models_config.json');
+    
+    if (fs.existsSync(configPath)) {
+        try {
+            const configContent = fs.readFileSync(configPath, 'utf8');
+            const modelsConfig = JSON.parse(configContent).models;
+            Object.keys(modelsConfig).forEach(modelName => {
+                leaderboardMap[modelName] = { score: 0.00, status: "untested", label: "Pending Setup ⏳" };
+            });
+        } catch(e) {
+            debugStatus += `<br><span style="color: #f44336;">❌ Error reading models_config.json</span>`;
+        }
+    } else {
+         debugStatus += `<br><span style="color: #f44336;">❌ models_config.json missing from root path!</span>`;
+    }
 
+    // Process system files and map to leaderboard
     systemFiles.forEach(file => {
         if (file.endsWith('.run.json')) {
             try {
@@ -154,7 +141,7 @@ function getWebviewContent(resultsPath: string, rootPath: string): string {
 
                         if (score > 1.0) { score = score / 100.0; }
 
-                        const isPipeline = matchedModel === "Gemini 3 Flash Preview";
+                        const isPipeline = matchedModel === "Gemini 3 Flash Preview" || matchedModel === "Gemini 3.5 Flash";
                         leaderboardMap[matchedModel] = {
                             score: score,
                             status: isPipeline ? "pipeline" : "success",
